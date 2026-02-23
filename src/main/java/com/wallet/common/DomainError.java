@@ -9,9 +9,10 @@ public enum DomainError {
         CURRENCY_MISMATCH("Wallets must have same currency"),
         NEGATIVE_BALANCE("Balance cannot be negative"),
         SELF_TRANSFER("Cannot transfer to same wallet"),
-        INVALID_INPUT("Input is null or invalid");
+        INVALID_INPUT("Input is null or invalid"),
+        TRANSACTION_NOT_FOUND("Transaction not found"),;
 
-        private final String message;
+    private final String message;
 
     DomainError(String message) {
         this.message = message;
