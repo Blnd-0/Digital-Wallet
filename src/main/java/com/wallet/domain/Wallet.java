@@ -16,42 +16,15 @@ LocalDateTime createdAt;
 
     public static Either<DomainError, Wallet> create(UUID id, String owner, Currency currency) {
         if (id == null)
-            return Either.left(new ValidationError("Wallet ID cannot be null"));
+            return Either.left(DomainError.INVALID_INPUT);
         if (owner == null || owner.isBlank())
-            return Either.left(new ValidationError("Owner name cannot be blank"));
+            return Either.left(DomainError.INVALID_INPUT);
         if (currency == null)
-            return Either.left(new ValidationError("Currency cannot be null"));
+            return Either.left(DomainError.INVALID_INPUT);
 
-        return Either.right(new Wallet(id, owner, currency));
+        return Either.right(new Wallet(id, owner, BigDecimal.ZERO, currency, LocalDateTime.now()));
     }
-
-public Wallet withDeposit(BigDecimal amount){
-    return new Wallet(
-            this.walletId,
-            this.ownerName,
-            this.balance.add(amount),
-            this.currency,
-            this.createdAt
-    );
-}
-
-public Wallet withWithdrawal(BigDecimal amount) {
-    return new Wallet(
-            this.walletId,
-            this.ownerName,
-            this.balance.subtract(amount),
-            this.currency,
-            this.createdAt
-    );
-}
-
-public Wallet withBalance(BigDecimal newBalance){
-    return new Wallet(
-            this.walletId,
-            this.ownerName,
-            newBalance,
-            this.currency,
-            this.createdAt
-    );
-}
+    public Wallet withBalance(BigDecimal newBalance) {
+        return new Wallet(walletId, ownerName, newBalance, currency, createdAt);
+    }
 }
