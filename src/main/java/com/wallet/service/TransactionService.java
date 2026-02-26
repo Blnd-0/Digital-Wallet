@@ -4,6 +4,7 @@ import com.wallet.domain.Transaction;
 import com.wallet.domain.TransactionType;
 import io.vavr.collection.List;
 import io.vavr.control.Either;
+import io.vavr.control.Option;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -16,21 +17,17 @@ public class TransactionService {
     private static final Logger logger = LoggerFactory.getLogger(TransactionService.class);
 
     public Either<DomainError, Transaction> saveTransaction(Transaction transaction) {
-        if(transaction == null){
-            logger.warn("transaction is null");
-            return Either.left (DomainError.INVALID_INPUT);
-        }
-        transactions.put(transaction.getTransactionId(), transaction);
-        logger.info("saving transaction {}", transaction.getTransactionId());
-        return Either.right (transaction);
+        return Option.of(transaction)
+                .toEither(DomainError.INVALID_INPUT)
+                .peek(transaction1 -> transactions.put(transaction1.getTransactionId(), transaction1))
+                .peek(transaction1 -> logger.info("saving transaction {}", transaction1.getTransactionId()))
+                .peekLeft(e -> logger.warn("Failed to save transaction: {}", e.getMessage()));
     }
     public Either<DomainError, Transaction> getTransactionById(UUID transactionId) {
-        if(transactions.containsKey(transactionId)){
-            logger.info("getting transaction {}", transactionId);
-            return Either.right (transactions.get(transactionId));
-        }
-        logger.warn("Transaction not found {}", transactionId);
-        return Either.left (DomainError.TRANSACTION_NOT_FOUND);
+        return Option.of(transactions.get(transactionId))
+                .toEither(DomainError.TRANSACTION_NOT_FOUND)
+                .peek(transaction -> logger.info("Transaction found: {}", transaction))
+                .peekLeft(e -> logger.warn("Transaction not found: {}", e.getMessage()));
     }
     public List<Transaction> getTransactionHistory(UUID walletId) {
         logger.info("getting transaction history {}", walletId);

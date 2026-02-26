@@ -37,5 +37,3 @@ public class Transaction {
         return Either.right(new Transaction(UUID.randomUUID(), TransactionType.TRANSFER, amount, Option.of(fromWalletId), Option.of(toWalletId), LocalDateTime.now(), status));
     }
 }
-
-
