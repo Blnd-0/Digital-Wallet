@@ -11,8 +11,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TransactionService {
-    private final Map<UUID, Transaction> transactions = new HashMap<>();
+    private final Map<UUID, Transaction> transactions = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(TransactionService.class);
+
+    public void loadTransactions(java.util.List<Transaction> loadedTransactions) {
+        loadedTransactions.forEach(t -> transactions.put(t.getTransactionId(), t));
+    }
 
     public Either<DomainError, Transaction> saveTransaction(Transaction transaction) {
         return Option.of(transaction)

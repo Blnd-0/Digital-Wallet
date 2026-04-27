@@ -1,100 +1,56 @@
 package com.wallet;
 
 import com.wallet.domain.Currency;
+import com.wallet.gui.WalletGui;
+import com.wallet.service.PersistenceService;
 import com.wallet.service.TransactionService;
 import com.wallet.service.TransferService;
 import com.wallet.service.WalletService;
+
+import javax.swing.*;
 import java.math.BigDecimal;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 public class Main {
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
         TransactionService transactionService = new TransactionService();
         WalletService walletService = new WalletService(transactionService);
-
-// Create wallet
-        var wallet = walletService.createWallet("Blnd", Currency.USD);
-        wallet.peek(w -> System.out.println("Created: " + w.getOwnerName() + " | " + w.getBalance()))
-                .peekLeft(e -> System.out.println("Create failed: " + e.getMessage()));
-
-        UUID walletId = wallet.get().getWalletId();
-
-// Deposit
-        walletService.deposit(walletId, new BigDecimal("500"))
-                .peek(w -> System.out.println("After deposit: " + w.getBalance()))
-                .peekLeft(e -> System.out.println("Deposit failed: " + e.getMessage()));
-
-// Withdraw
-        walletService.withdraw(walletId, new BigDecimal("200"))
-                .peek(w -> System.out.println("After withdraw: " + w.getBalance()))
-                .peekLeft(e -> System.out.println("Withdraw failed: " + e.getMessage()));
-
-// Withdraw more than balance
-        walletService.withdraw(walletId, new BigDecimal("99999"))
-                .peekLeft(e -> System.out.println("Expected failure: " + e.getMessage()));
-
-        System.out.println("*******************************************************************************************");
-        System.out.println("*******************************************************************************************");
-
-// Non-existent wallet
-        walletService.deposit(UUID.randomUUID(), new BigDecimal("100"))
-                .peekLeft(e -> System.out.println("Expected failure: " + e.getMessage()));
-        // saveTransaction - null
-        transactionService.saveTransaction(null)
-                .peekLeft(e -> System.out.println("Null transaction: " + e.getMessage()));
-
-// getTransactionById - invalid ID
-        transactionService.getTransactionById(UUID.randomUUID())
-                .peekLeft(e -> System.out.println("Transaction not found: " + e.getMessage()));
-
-// getTransactionHistory - use walletId from above
-        transactionService.getTransactionHistory(walletId)
-                .forEach(t -> System.out.println("History: " + t.getTransactionId() + " | " + t.getType()));
-
-// getAllTransactions
-        transactionService.getAllTransactions()
-                .forEach(t -> System.out.println("All: " + t.getTransactionId() + " | " + t.getType()));
         TransferService transferService = new TransferService(walletService, transactionService);
+        PersistenceService persistenceService = new PersistenceService();
 
-// Create two wallets
-        var wallet1 = walletService.createWallet("Blnd", Currency.USD);
-        var wallet2 = walletService.createWallet("Ali", Currency.USD);
-        UUID wallet1Id = wallet1.get().getWalletId();
-        UUID wallet2Id = wallet2.get().getWalletId();
+        // Load data
+        walletService.loadWallets(persistenceService.loadWallets());
+        transactionService.loadTransactions(persistenceService.loadTransactions());
 
-// Deposit into wallet1
-        walletService.deposit(wallet1Id, new BigDecimal("1000"));
+        // Save data helper
+        Runnable saveAction = () -> {
+            persistenceService.saveWallets(walletService.getAllWallets());
+            persistenceService.saveTransactions(transactionService.getAllTransactions().toJavaList());
+        };
 
-// Valid transfer
-        transferService.transfer(wallet1Id, wallet2Id, new BigDecimal("300"))
-                .peek(t -> System.out.println("Transfer success: " + t.getTransactionId()))
-                .peekLeft(e -> System.out.println("Transfer failed: " + e.getMessage()));
+        // Save data on shutdown
+        Runtime.getRuntime().addShutdownHook(new Thread(saveAction));
 
-// Self transfer
-        transferService.transfer(wallet1Id, wallet1Id, new BigDecimal("100"))
-                .peekLeft(e -> System.out.println("Self transfer: " + e.getMessage()));
+        startApp(walletService, transactionService, transferService, saveAction);
+    }
 
-// Insufficient funds
-        transferService.transfer(wallet1Id, wallet2Id, new BigDecimal("99999"))
-                .peekLeft(e -> System.out.println("Insufficient: " + e.getMessage()));
+    public static void startApp(WalletService walletService, TransactionService transactionService, TransferService transferService, Runnable saveAction) {
+        startApp(walletService, transactionService, transferService, saveAction, true);
+    }
 
-// Invalid amount
-        transferService.transfer(wallet1Id, wallet2Id, new BigDecimal("-50"))
-                .peekLeft(e -> System.out.println("Invalid amount: " + e.getMessage()));
+    public static void startApp(WalletService walletService, TransactionService transactionService, TransferService transferService, Runnable saveAction, boolean exitOnCancel) {
+        // Simple 'login'
+        String username = JOptionPane.showInputDialog(null, "Enter your username:", "Login", JOptionPane.QUESTION_MESSAGE);
+        
+        if (username == null || username.trim().isEmpty()) {
+            if (exitOnCancel) {
+                System.exit(0);
+            }
+            return;
+        }
 
-// Non-existent wallet
-        transferService.transfer(UUID.randomUUID(), wallet2Id, new BigDecimal("100"))
-                .peekLeft(e -> System.out.println("Wallet not found: " + e.getMessage()));
-
-// Currency mismatch
-        var wallet3 = walletService.createWallet("Sara", Currency.EUR);
-        UUID wallet3Id = wallet3.get().getWalletId();
-        walletService.deposit(wallet3Id, new BigDecimal("500"));
-        transferService.transfer(wallet1Id, wallet3Id, new BigDecimal("100"))
-                .peekLeft(e -> System.out.println("Currency mismatch: " + e.getMessage()));
+        SwingUtilities.invokeLater(() -> {
+            WalletGui gui = new WalletGui(username, walletService, transactionService, transferService, saveAction);
+            gui.setVisible(true);
+        });
     }
 }

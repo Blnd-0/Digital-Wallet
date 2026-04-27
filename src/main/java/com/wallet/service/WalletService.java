@@ -17,11 +17,19 @@ public class WalletService {
     private static final Logger logger = LoggerFactory.getLogger(WalletService.class);
     // TODO: Switch to ConcurrentHashMap to prevent structural corruption on concurrent access to different keys
     // private final Map<UUID, Wallet> wallets = new ConcurrentHashMap<>();
-    private final Map<UUID, Wallet> wallets = new HashMap<>();
+    private final Map<UUID, Wallet> wallets = new java.util.concurrent.ConcurrentHashMap<>();
     private final TransactionService transactionService;
 
     public WalletService(TransactionService transactionService) {
         this.transactionService = transactionService;
+    }
+
+    public void loadWallets(java.util.List<Wallet> loadedWallets) {
+        loadedWallets.forEach(w -> wallets.put(w.getWalletId(), w));
+    }
+
+    public java.util.Collection<Wallet> getAllWallets() {
+        return wallets.values();
     }
 
     public Either<DomainError, Wallet> createWallet(String owner, Currency currency) {
@@ -68,5 +76,10 @@ public class WalletService {
                 .toEither(DomainError.WALLET_NOT_FOUND)
                 .peek(wallet -> logger.info("Wallet found: {}", wallet))
                 .peekLeft(e -> logger.warn("Wallet not found: {}", e.getMessage()));
+    }
+
+    public io.vavr.collection.List<Wallet> getWalletsByOwner(String ownerName) {
+        return io.vavr.collection.List.ofAll(wallets.values())
+                .filter(w -> w.getOwnerName().equals(ownerName));
     }
 }
