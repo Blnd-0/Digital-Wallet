@@ -1,35 +1,39 @@
 # Digital Wallet
 
-A Java-based digital wallet application that manages user wallets, supports multi-currency balances, and handles deposits, withdrawals, and transfers between wallets. Built with a functional error-handling style using [Vavr](https://www.vavr.io/) and designed with thread-safe transfer operations.
+A Java-based digital wallet application with a Swing GUI that manages user wallets, supports multi-currency balances, and handles deposits, withdrawals, and transfers between wallets. Built with a functional error-handling style using [Vavr](https://www.vavr.io/), CSV-based persistence, and thread-safe transfer operations.
 
 ## Features
 
-- **Wallet management** — create wallets with an owner name and currency (USD, IQD, EUR).
+- **Multi-user login** — username-based session login with Switch User support; each user sees only their own wallets.
+- **Wallet management** — create wallets with an owner name and currency (USD, EUR, GBP).
 - **Deposits & withdrawals** — add or remove funds with validation (positive amounts, sufficient balance).
 - **Transfers** — move funds between wallets safely, with checks for:
   - Self-transfers
   - Currency mismatch
   - Insufficient funds
   - Non-existent wallets
-- **Transaction history** — every successful operation is recorded; history can be queried per wallet or globally.
+- **Transaction history** — every operation is recorded and displayed per wallet in the GUI.
+- **Export to CSV** — user-triggered export of all transactions for the logged-in user via a file save dialog.
+- **CSV persistence** — wallets and transactions are loaded from CSV on startup and saved on shutdown automatically.
 - **Functional error handling** — operations return `Either<DomainError, T>` instead of throwing exceptions, making failure cases explicit and chainable.
-- **Concurrency-safe transfers** — per-wallet `ReentrantLock`s with consistent lock ordering to prevent deadlocks during concurrent transfers.
+- **Concurrency-safe transfers** — per-wallet `ReentrantLock`s with consistent UUID-ordered lock acquisition to prevent deadlocks during concurrent transfers.
 - **Logging** — SLF4J + Logback integration for info/warn-level operational logs.
 
 ## Tech Stack
 
 - **Java 21**
 - **Maven** (build tool)
+- **Swing** — built-in Java GUI framework
 - **Vavr 0.10.4** — functional types (`Either`, `Option`, immutable `List`)
 - **Lombok 1.18.30** — boilerplate reduction (`@Value`, `@Getter`, `@AllArgsConstructor`)
 - **SLF4J 2.0.16 + Logback 1.5.12** — logging
-- **JUnit 5** & **AssertJ** — testing dependencies (declared)
+- **JUnit 5** & **AssertJ** — unit and concurrency testing
 
 ## Project Structure
 
 ```
 src/main/java/com/wallet/
-├── Main.java                      # Demo entry point exercising the services
+├── Main.java                      # Entry point: service wiring, CSV load/save, login, GUI launch
 ├── common/
 │   └── DomainError.java           # Enum of domain-level error codes & messages
 ├── domain/
@@ -37,18 +41,20 @@ src/main/java/com/wallet/
 │   ├── Transaction.java           # Immutable transaction record
 │   ├── TransactionType.java       # DEPOSIT, WITHDRAW, TRANSFER
 │   ├── TransactionStatus.java     # SUCCESS, FAILED
-│   └── Currency.java              # USD, IQD, EUR
-└── service/
-    ├── WalletService.java         # Create wallets, deposit, withdraw
-    ├── TransactionService.java    # Save & query transactions
-    ├── TransferService.java       # Lock-based wallet-to-wallet transfers
-    └── DailyLimitTracker.java     # (planned) per-wallet daily transaction limits
+│   └── Currency.java              # USD, EUR, GBP
+├── service/
+│   ├── WalletService.java         # Create wallets, deposit, withdraw
+│   ├── TransactionService.java    # Save & query transactions
+│   ├── TransferService.java       # Lock-based wallet-to-wallet transfers
+│   └── PersistenceService.java    # CSV read/write for wallets and transactions
+└── gui/
+    └── WalletGui.java             # Swing GUI: wallet controls, transaction table, export
 ```
 
 ## Domain Model
 
 ### Wallet
-An immutable record (`@Value`) holding `walletId`, `ownerName`, `balance`, `currency`, and `createdAt`. New balances produce a new `Wallet` instance via `withBalance(...)` rather than mutating in place.
+An immutable record (`@Value`) holding `walletId`, `ownerName`, `balance`, `currency`, and `createdAt`. New balances produce a new `Wallet` instance via `withBalance(...)` rather than mutating in place. The updated instance is stored back into the `ConcurrentHashMap`.
 
 ### Transaction
 An immutable record describing a single operation. Uses Vavr `Option<UUID>` for `fromWalletId` and `toWalletId` because deposits have no source and withdrawals have no destination. Factory methods (`createDeposit`, `createWithdrawal`, `createTransfer`) validate the amount and return `Either<DomainError, Transaction>`.
@@ -62,9 +68,13 @@ Every service operation returns `Either<DomainError, T>`:
 - **Right** — the success value (a `Wallet` or `Transaction`).
 - **Left** — a `DomainError` describing why it failed.
 
-This lets callers chain operations with `.flatMap(...)` / `.map(...)` and inspect outcomes with `.peek(...)` / `.peekLeft(...)` without throwing or catching exceptions.
+This lets callers chain operations with `.flatMap(...)` / `.map(...)` and handle side effects (logging, persistence) with `.peek(...)` / `.peekLeft(...)` without throwing or catching exceptions.
 
-For transfers, `TransferService` acquires `ReentrantLock`s for **both** wallets in a deterministic order (lower UUID first) before performing the withdrawal-then-deposit sequence, preventing deadlocks when two transfers between the same pair of wallets run concurrently.
+For transfers, `TransferService` acquires `ReentrantLock`s for **both** wallets in a deterministic order (lower UUID string first) before performing the withdrawal-then-deposit sequence, preventing deadlocks when two transfers between the same pair of wallets run concurrently.
+
+## Persistence
+
+On startup, `Main` loads `wallets.csv` and `transactions.csv` into memory via `PersistenceService`. A JVM shutdown hook saves all current state back to those files when the application exits. The CSV format is flat and comma-separated; owner names containing commas are a known limitation.
 
 ## Getting Started
 
@@ -77,19 +87,22 @@ For transfers, `TransferService` acquires `ReentrantLock`s for **both** wallets 
 mvn clean compile
 ```
 
-### Run the demo
-The `Main` class walks through wallet creation, deposits, withdrawals, valid and invalid transfers, and prints the resulting transaction history.
-
+### Run
 ```bash
 mvn exec:java -Dexec.mainClass="com.wallet.Main"
 ```
+Or run `Main.java` directly from your IDE. A login dialog will appear on startup.
 
-…or run `Main.java` directly from your IDE.
+## Testing
 
+JUnit 5 tests cover:
+- Successful deposits, withdrawals, and transfers (happy paths)
+- Edge cases: null inputs, invalid amounts, insufficient funds, currency mismatches, self-transfers
+- Concurrency: bidirectional concurrent transfer test to verify deadlock prevention
 
 ## Notes & Limitations
 
-- **In-memory storage** — wallets and transactions are stored in `HashMap`s; data is lost on restart. A persistence layer (DB / repository) is the natural next step.
+- **CSV fragility** — owner names or fields containing commas will break CSV parsing. A quoted-field CSV parser would fix this.
+- **No authentication** — login is username-only; there are no passwords or access controls.
 - **`DailyLimitTracker` is a stub** — the class exists as a placeholder; per-wallet daily transaction limits are not yet implemented.
-- **No exposed API** — the project is a library/demo; there is no REST or CLI layer yet.
-- **Tests not yet authored** — JUnit 5 and AssertJ are wired into the build, but no test classes are present in `src/test`.
+- **No REST or CLI layer** — the application is GUI-only; there is no API exposed.
