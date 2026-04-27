@@ -1,7 +1,6 @@
 package com.wallet.service;
 import com.wallet.common.DomainError;
 import com.wallet.domain.Transaction;
-import com.wallet.domain.TransactionType;
 import io.vavr.collection.List;
 import io.vavr.control.Either;
 import io.vavr.control.Option;
@@ -10,7 +9,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 public class TransactionService {
     private final Map<UUID, Transaction> transactions = new HashMap<>();

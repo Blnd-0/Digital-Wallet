@@ -15,6 +15,8 @@ import org.slf4j.LoggerFactory;
 
 public class WalletService {
     private static final Logger logger = LoggerFactory.getLogger(WalletService.class);
+    // TODO: Switch to ConcurrentHashMap to prevent structural corruption on concurrent access to different keys
+    // private final Map<UUID, Wallet> wallets = new ConcurrentHashMap<>();
     private final Map<UUID, Wallet> wallets = new HashMap<>();
     private final TransactionService transactionService;
 
@@ -32,6 +34,10 @@ public class WalletService {
             logger.warn("Invalid amount for deposit: {}", amount);
             return Either.left(DomainError.INVALID_AMOUNT);
         }
+        // TODO: Race condition — two concurrent deposits on the same wallet both read the same balance,
+        //       compute independently, and one overwrites the other (lost update).
+        //       Fix: replace the three lines below with wallets.compute(walletId, (id, w) -> w.withBalance(w.getBalance().add(amount)))
+        //       That makes the read-modify-write atomic. Requires ConcurrentHashMap above.
         return getWallet(walletId)
                 .map(wallet -> wallet.withBalance(wallet.getBalance().add(amount)))
                 .peek(updatedWallet -> wallets.put(walletId, updatedWallet))
@@ -44,6 +50,9 @@ public class WalletService {
             logger.warn("Invalid amount for withdraw: {}", amount);
             return Either.left(DomainError.INVALID_AMOUNT);
         }
+        // TODO: Same race condition as deposit — same fix applies (wallets.compute with ConcurrentHashMap).
+        //       Also note: the balance check and subtract are two separate steps, so another thread could
+        //       withdraw between them. compute() wraps the whole thing atomically.
         return getWallet(walletId)
                 .flatMap(wallet->wallet.getBalance().compareTo(amount) < 0
                         ? Either.left(DomainError.INSUFFICIENT_FUNDS)

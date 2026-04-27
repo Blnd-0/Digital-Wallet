@@ -23,7 +23,9 @@ public class TransferService {
     public Either<DomainError, Transaction> transfer(UUID fromWalletId, UUID toWalletId, BigDecimal amount) {
         ReentrantLock lock1;
         ReentrantLock lock2;
-
+        if (fromWalletId == null || toWalletId == null) {
+            return Either.left(DomainError.INVALID_INPUT);
+        }
         if (fromWalletId.compareTo(toWalletId) < 0) {
             lock1 = getLock(fromWalletId);
             lock2 = getLock(toWalletId);
