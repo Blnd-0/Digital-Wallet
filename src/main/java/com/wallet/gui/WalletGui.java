@@ -4,6 +4,7 @@ import com.wallet.Main;
 import com.wallet.domain.Currency;
 import com.wallet.domain.Transaction;
 import com.wallet.domain.Wallet;
+import com.wallet.service.PersistenceService;
 import com.wallet.service.TransactionService;
 import com.wallet.service.TransferService;
 import com.wallet.service.WalletService;
@@ -142,8 +143,11 @@ public class WalletGui extends JFrame {
         balanceLabel = new JLabel("Balance: -");
         JButton switchUserBtn = new JButton("Switch User");
         switchUserBtn.addActionListener(e -> handleSwitchUser());
+        JButton exportCsvBtn = new JButton("Export CSV");
+        exportCsvBtn.addActionListener(e -> handleExportCsv());
         leftBottom.add(balanceLabel);
         leftBottom.add(switchUserBtn);
+        leftBottom.add(exportCsvBtn);
 
         statusLabel = new JLabel("Welcome, " + ownerName);
         statusLabel.setForeground(Color.BLUE);
@@ -257,6 +261,34 @@ public class WalletGui extends JFrame {
     private void handleSwitchUser() {
         this.dispose();
         Main.startApp(walletService, transactionService, transferService, saveAction, false);
+    }
+
+    private void handleExportCsv() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Export Transactions to CSV");
+        fileChooser.setSelectedFile(new java.io.File("transactions_export.csv"));
+        
+        int userSelection = fileChooser.showSaveDialog(this);
+        
+        if (userSelection == javax.swing.JFileChooser.APPROVE_OPTION) {
+            java.io.File fileToSave = fileChooser.getSelectedFile();
+            
+            // Gather all transactions for the current user
+            var userWallets = walletService.getWalletsByOwner(ownerName);
+            var walletIds = userWallets.map(Wallet::getWalletId).toSet();
+            
+            var allTransactions = transactionService.getAllTransactions();
+            var userTransactions = allTransactions.filter(t -> 
+                t.getFromWalletId().exists(walletIds::contains) || 
+                t.getToWalletId().exists(walletIds::contains)
+            );
+            
+            PersistenceService persistenceService = new PersistenceService();
+            persistenceService.saveTransactionsToFile(userTransactions.toJavaList(), fileToSave);
+            
+            statusLabel.setText("Exported " + userTransactions.size() + " transactions to " + fileToSave.getName());
+            statusLabel.setForeground(new Color(0, 100, 0)); // Dark green
+        }
     }
 
     private void withSelectedWallet(java.util.function.Consumer<Wallet> action) {
