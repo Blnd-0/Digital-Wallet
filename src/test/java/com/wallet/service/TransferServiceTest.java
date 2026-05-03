@@ -31,47 +31,47 @@ public class TransferServiceTest {
         walletService.deposit(wallet1Id, new BigDecimal("1000"));
         walletService.deposit(wallet2Id, new BigDecimal("1000"));
     }
-//
-//    @Test
-//    void shouldTransferSuccessfully() {
-//        var result = transferService.transfer(wallet1Id, wallet2Id, new BigDecimal("300"));
-//        assertThat(result.isRight()).isTrue();
-//        assertThat(result.get().getType()).isEqualTo(TransactionType.TRANSFER);
-//        assertThat(walletService.getWallet(wallet1Id).get().getBalance()).isEqualByComparingTo("700");
-//        assertThat(walletService.getWallet(wallet2Id).get().getBalance()).isEqualByComparingTo("1300");
-//    }
-//
-//    @Test
-//    void shouldFailSelfTransfer() {
-//        var result = transferService.transfer(wallet1Id, wallet1Id, new BigDecimal("100"));
-//        assertThat(result.isLeft()).isTrue();
-//    }
-//
-//    @Test
-//    void shouldFailInsufficientFunds() {
-//        var result = transferService.transfer(wallet1Id, wallet2Id, new BigDecimal("99999"));
-//        assertThat(result.isLeft()).isTrue();
-//    }
-//
-//    @Test
-//    void shouldFailInvalidAmount() {
-//        var result = transferService.transfer(wallet1Id, wallet2Id, new BigDecimal("-100"));
-//        assertThat(result.isLeft()).isTrue();
-//    }
-//
-//    @Test
-//    void shouldFailNonExistentWallet() {
-//        var result = transferService.transfer(UUID.randomUUID(), wallet2Id, new BigDecimal("100"));
-//        assertThat(result.isLeft()).isTrue();
-//    }
-//
-//    @Test
-//    void shouldFailCurrencyMismatch() {
-//        UUID eurWalletId = walletService.createWallet("Sara", Currency.EUR).get().getWalletId();
-//        walletService.deposit(eurWalletId, new BigDecimal("500"));
-//        var result = transferService.transfer(wallet1Id, eurWalletId, new BigDecimal("100"));
-//        assertThat(result.isLeft()).isTrue();
-//    }
+
+    @Test
+    void shouldTransferSuccessfully() {
+        var result = transferService.transfer(wallet1Id, wallet2Id, new BigDecimal("300"));
+        assertThat(result.isRight()).isTrue();
+        assertThat(result.get().getType()).isEqualTo(TransactionType.TRANSFER);
+        assertThat(walletService.getWallet(wallet1Id).get().getBalance()).isEqualByComparingTo("700");
+        assertThat(walletService.getWallet(wallet2Id).get().getBalance()).isEqualByComparingTo("1300");
+    }
+
+    @Test
+    void shouldFailSelfTransfer() {
+        var result = transferService.transfer(wallet1Id, wallet1Id, new BigDecimal("100"));
+        assertThat(result.isLeft()).isTrue();
+    }
+
+    @Test
+    void shouldFailInsufficientFunds() {
+        var result = transferService.transfer(wallet1Id, wallet2Id, new BigDecimal("99999"));
+        assertThat(result.isLeft()).isTrue();
+    }
+
+    @Test
+    void shouldFailInvalidAmount() {
+        var result = transferService.transfer(wallet1Id, wallet2Id, new BigDecimal("-100"));
+        assertThat(result.isLeft()).isTrue();
+    }
+
+    @Test
+    void shouldFailNonExistentWallet() {
+        var result = transferService.transfer(UUID.randomUUID(), wallet2Id, new BigDecimal("100"));
+        assertThat(result.isLeft()).isTrue();
+    }
+
+    @Test
+    void shouldFailCurrencyMismatch() {
+        UUID eurWalletId = walletService.createWallet("Sara", Currency.EUR).get().getWalletId();
+        walletService.deposit(eurWalletId, new BigDecimal("500"));
+        var result = transferService.transfer(wallet1Id, eurWalletId, new BigDecimal("100"));
+        assertThat(result.isLeft()).isTrue();
+    }
 
     @Test
     void shouldHandleConcurrentTransfers() throws InterruptedException {

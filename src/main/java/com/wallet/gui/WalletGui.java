@@ -246,7 +246,7 @@ public class WalletGui extends JFrame {
     }
 
     private void handleCreateWallet() {
-        String[] currencies = {"USD", "EUR", "GBP"};
+        String[] currencies = {"USD", "EUR", "IQD"};
         String currencyStr = (String) JOptionPane.showInputDialog(this, "Select Currency", "Create Wallet",
                 JOptionPane.QUESTION_MESSAGE, null, currencies, currencies[0]);
         
