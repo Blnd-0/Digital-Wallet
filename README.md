@@ -104,5 +104,4 @@ JUnit 5 tests cover:
 
 - **CSV fragility** — owner names or fields containing commas will break CSV parsing. A quoted-field CSV parser would fix this.
 - **No authentication** — login is username-only; there are no passwords or access controls.
-- **`DailyLimitTracker` is a stub** — the class exists as a placeholder; per-wallet daily transaction limits are not yet implemented.
 - **No REST or CLI layer** — the application is GUI-only; there is no API exposed.
