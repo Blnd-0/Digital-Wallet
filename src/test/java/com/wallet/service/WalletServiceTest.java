@@ -111,6 +111,14 @@ public class WalletServiceTest {
         var result = walletService.deposit(wallet.getWalletId(), null);
         assertThat(result.isLeft()).isTrue();
     }
+    
+    @Test
+    void shouldFailDepositExceedingMaxAmount() {
+        var wallet = walletService.createWallet("Blnd", Currency.USD).get();
+        var result = walletService.deposit(wallet.getWalletId(), WalletService.MAX_DEPOSIT_AMOUNT.add(BigDecimal.ONE));
+        assertThat(result.isLeft()).isTrue();
+        assertThat(result.getLeft()).isEqualTo(com.wallet.common.DomainError.EXCEEDS_MAX_DEPOSIT);
+    }
 
     @Test
     void shouldFailCreateWalletNullCurrency() {
@@ -122,5 +130,36 @@ public class WalletServiceTest {
     void shouldFailCreateWalletNullOwner() {
         var result = walletService.createWallet(null, Currency.USD);
         assertThat(result.isLeft()).isTrue();
+    }
+
+    @Test
+    void concurrentDepositRaceCondition() throws InterruptedException {
+        // arrange
+        var wallet = walletService.createWallet("ConcurrentOwner", Currency.USD).get();
+        int threadsCount = 100;
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(threadsCount);
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(threadsCount);
+
+        // act
+        for (int i = 0; i < threadsCount; i++) {
+            executor.submit(() -> {
+                try {
+                    walletService.deposit(wallet.getWalletId(), BigDecimal.ONE);
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        latch.await(10, java.util.concurrent.TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // assert
+        var updatedWallet = walletService.getWallet(wallet.getWalletId()).get();
+        // This is expected to fail if there's a race condition
+        if (updatedWallet.getBalance().compareTo(new BigDecimal("100")) != 0) {
+            throw new RuntimeException("Race condition detected! Final balance was " + updatedWallet.getBalance() + " instead of 100");
+        }
+        assertThat(updatedWallet.getBalance()).isEqualByComparingTo(new BigDecimal("100"));
     }
 }

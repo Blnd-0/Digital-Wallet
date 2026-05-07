@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 public class WalletService {
     private static final Logger logger = LoggerFactory.getLogger(WalletService.class);
+    public static final BigDecimal MAX_DEPOSIT_AMOUNT = new BigDecimal("10000");
     // TODO: Switch to ConcurrentHashMap to prevent structural corruption on concurrent access to different keys
     // private final Map<UUID, Wallet> wallets = new ConcurrentHashMap<>();
     private final Map<UUID, Wallet> wallets = new java.util.concurrent.ConcurrentHashMap<>();
@@ -42,34 +43,54 @@ public class WalletService {
             logger.warn("Invalid amount for deposit: {}", amount);
             return Either.left(DomainError.INVALID_AMOUNT);
         }
-        // TODO: Race condition — two concurrent deposits on the same wallet both read the same balance,
-        //       compute independently, and one overwrites the other (lost update).
-        //       Fix: replace the three lines below with wallets.compute(walletId, (id, w) -> w.withBalance(w.getBalance().add(amount)))
-        //       That makes the read-modify-write atomic. Requires ConcurrentHashMap above.
-        return getWallet(walletId)
-                .map(wallet -> wallet.withBalance(wallet.getBalance().add(amount)))
-                .peek(updatedWallet -> wallets.put(walletId, updatedWallet))
+        if (amount.compareTo(MAX_DEPOSIT_AMOUNT) > 0) {
+            logger.warn("Deposit amount {} exceeds maximum allowed limit {}", amount, MAX_DEPOSIT_AMOUNT);
+            return Either.left(DomainError.EXCEEDS_MAX_DEPOSIT);
+        }
+        @SuppressWarnings("unchecked")
+        Either<DomainError, Wallet>[] depositResult = new Either[1];
+        wallets.compute(walletId, (id, w) -> {
+            if (w == null) {
+                depositResult[0] = Either.left(DomainError.WALLET_NOT_FOUND);
+                return null;
+            }
+            Wallet updated = w.withBalance(w.getBalance().add(amount));
+            depositResult[0] = Either.right(updated);
+            return updated;
+        });
+        Either<DomainError, Wallet> depositEither = depositResult[0] != null ? depositResult[0] : Either.left(DomainError.WALLET_NOT_FOUND);
+        return depositEither
                 .peek(updatedWallet -> Transaction.createDeposit(walletId, amount, TransactionStatus.SUCCESS)
                         .forEach(transactionService::saveTransaction))
-                .peek(updatedWallet -> logger.info("Wallet updated: {}", updatedWallet));
+                .peek(updatedWallet -> logger.info("Wallet updated: {}", updatedWallet))
+                .peekLeft(e -> logger.warn("Deposit failed: {}", e.getMessage()));
     }
     public Either<DomainError, Wallet> withdraw(UUID walletId, BigDecimal amount) {
         if(amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             logger.warn("Invalid amount for withdraw: {}", amount);
             return Either.left(DomainError.INVALID_AMOUNT);
         }
-        // TODO: Same race condition as deposit — same fix applies (wallets.compute with ConcurrentHashMap).
-        //       Also note: the balance check and subtract are two separate steps, so another thread could
-        //       withdraw between them. compute() wraps the whole thing atomically.
-        return getWallet(walletId)
-                .flatMap(wallet->wallet.getBalance().compareTo(amount) < 0
-                        ? Either.left(DomainError.INSUFFICIENT_FUNDS)
-                        : Either.right(wallet))
-                .map(wallet -> wallet.withBalance(wallet.getBalance().subtract(amount)))
-                .peek(updatedWallet -> wallets.put(walletId, updatedWallet))
+        @SuppressWarnings("unchecked")
+        Either<DomainError, Wallet>[] withdrawResult = new Either[1];
+        wallets.compute(walletId, (id, w) -> {
+            if (w == null) {
+                withdrawResult[0] = Either.left(DomainError.WALLET_NOT_FOUND);
+                return null;
+            }
+            if (w.getBalance().compareTo(amount) < 0) {
+                withdrawResult[0] = Either.left(DomainError.INSUFFICIENT_FUNDS);
+                return w;
+            }
+            Wallet updated = w.withBalance(w.getBalance().subtract(amount));
+            withdrawResult[0] = Either.right(updated);
+            return updated;
+        });
+        Either<DomainError, Wallet> withdrawEither = withdrawResult[0] != null ? withdrawResult[0] : Either.left(DomainError.WALLET_NOT_FOUND);
+        return withdrawEither
                 .peek(updatedWallet -> Transaction.createWithdrawal(walletId, amount, TransactionStatus.SUCCESS)
-                .forEach(transactionService::saveTransaction))
-                .peek(updatedWallet -> logger.info("Wallet updated: {}", updatedWallet));
+                        .forEach(transactionService::saveTransaction))
+                .peek(updatedWallet -> logger.info("Wallet updated: {}", updatedWallet))
+                .peekLeft(e -> logger.warn("Withdraw failed: {}", e.getMessage()));
     }
     public Either<DomainError, Wallet> getWallet(UUID walletId) {
         return Option.of(wallets.get(walletId))

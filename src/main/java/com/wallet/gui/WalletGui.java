@@ -316,7 +316,12 @@ public class WalletGui extends JFrame {
             refreshWallets();
             amountField.setText("");
         } else {
-            showError(result.getLeft().toString());
+            Object left = result.getLeft();
+            if (left instanceof com.wallet.common.DomainError) {
+                showError(((com.wallet.common.DomainError) left).getMessage());
+            } else {
+                showError(left.toString());
+            }
         }
     }
 

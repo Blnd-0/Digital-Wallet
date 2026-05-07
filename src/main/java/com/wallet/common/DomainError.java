@@ -10,7 +10,8 @@ public enum DomainError {
         NEGATIVE_BALANCE("Balance cannot be negative"),
         SELF_TRANSFER("Cannot transfer to same wallet"),
         INVALID_INPUT("Input is null or invalid"),
-        TRANSACTION_NOT_FOUND("Transaction not found"),;
+        TRANSACTION_NOT_FOUND("Transaction not found"),
+        EXCEEDS_MAX_DEPOSIT("Deposit amount exceeds the maximum allowed limit"),;
 
     private final String message;
 
