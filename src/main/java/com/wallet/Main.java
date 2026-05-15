@@ -38,19 +38,26 @@ public class Main {
     }
 
     public static void startApp(WalletService walletService, TransactionService transactionService, TransferService transferService, Runnable saveAction, boolean exitOnCancel) {
-        // Simple 'login'
-        String username = JOptionPane.showInputDialog(null, "Enter your username:", "Login", JOptionPane.QUESTION_MESSAGE);
-        
-        if (username == null || username.trim().isEmpty()) {
-            if (exitOnCancel) {
-                System.exit(0);
-            }
-            return;
-        }
+        while (true) {
+            String username = JOptionPane.showInputDialog(null, "Enter your username:", "Login", JOptionPane.QUESTION_MESSAGE);
 
-        SwingUtilities.invokeLater(() -> {
-            WalletGui gui = new WalletGui(username, walletService, transactionService, transferService, saveAction);
-            gui.setVisible(true);
-        });
+            if (username == null) {
+                if (exitOnCancel) System.exit(0);
+                return;
+            }
+
+            if (username.trim().isEmpty()) {
+                JOptionPane.showMessageDialog(null, "Username cannot be empty. Please try again.", "Invalid Username", JOptionPane.WARNING_MESSAGE);
+                continue;
+            }
+
+            final String validUsername = username.trim();
+            SwingUtilities.invokeLater(() -> {
+                WalletGui gui = new WalletGui(validUsername, walletService, transactionService, transferService, saveAction);
+                gui.setVisible(true);
+            });
+            break;
+        }
     }
-}
+    }
+

@@ -214,7 +214,7 @@ public class WalletGui extends JFrame {
         withSelectedWallet(wallet -> {
             BigDecimal amount = getAmount();
             if (amount == null) return;
-            
+
             var result = walletService.deposit(wallet.getWalletId(), amount);
             handleResult(result, "Deposit successful");
         });
@@ -224,7 +224,7 @@ public class WalletGui extends JFrame {
         withSelectedWallet(wallet -> {
             BigDecimal amount = getAmount();
             if (amount == null) return;
-            
+
             var result = walletService.withdraw(wallet.getWalletId(), amount);
             handleResult(result, "Withdrawal successful");
         });
@@ -239,7 +239,7 @@ public class WalletGui extends JFrame {
             }
             BigDecimal amount = getAmount();
             if (amount == null) return;
-            
+
             var result = transferService.transfer(fromWallet.getWalletId(), targetWrapper.wallet.getWalletId(), amount);
             handleResult(result, "Transfer successful");
         });
